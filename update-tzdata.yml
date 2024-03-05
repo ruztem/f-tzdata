@@ -1,0 +1,38 @@
+---
+- name: Update tzdata
+  hosts: host
+  become: yes
+  tasks:
+    - name: Update tzdata on Red Hat based systems using yum
+      ansible.builtin.command: yum update -y tzdata
+      when: ansible_distribution in ['Fedora', 'AlmaLinux', 'Rocky', 'CentOS', 'OracleLinux']
+
+    - name: Update tzdata on Red Hat based systems using dnf
+      ansible.builtin.command: dnf update -y tzdata
+      when: ansible_distribution == 'OracleLinux' and ansible_distribution_major_version == '8'
+      when: ansible_distribution == 'CentOS' and ansible_distribution_major_version == '8'
+
+    - name: Update tzdata on Debian based systems
+      ansible.builtin.command: apt-get install --only-upgrade tzdata -y
+      when: ansible_os_family == 'Debian' or ansible_os_family == 'Ubuntu'
+
+    - name: Check if Ubuntu for downloading tzdata package
+      ansible.builtin.shell: cat /etc/os-release | grep -qi '^ID=ubuntu'
+      register: ubuntu_check
+      changed_when: false
+      failed_when: false
+
+    - name: Download tzdata package from Ubuntu repository
+      ansible.builtin.get_url:
+        url: http://archive.ubuntu.com/ubuntu/pool/main/t/tzdata/tzdata_2024a-1ubuntu1_all.deb
+        dest: /tmp/tzdata_2024a-1ubuntu1_all.deb
+      when: ubuntu_check.rc == 0
+
+    - name: Checking if file downloaded
+      ansible.builtin.debug:
+        msg: "tzdata package downloaded on Ubuntu: {{ ubuntu_check.rc == 0 }}"
+
+    - name: Install tzdata package using dpkg
+      ansible.builtin.command: sudo dpkg -i /tmp/tzdata_2024a-1ubuntu1_all.deb
+      ignore_errors: true
+      when: ubuntu_check.rc == 0
